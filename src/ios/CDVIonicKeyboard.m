@@ -44,8 +44,6 @@ typedef enum : NSUInteger {
 
 @implementation CDVIonicKeyboard
 
-NSTimer *hideTimer;
-
 - (id)settingForKey:(NSString *)key
 {
     return [self.commandDelegate.settings objectForKey:[key lowercaseString]];
@@ -115,46 +113,47 @@ NSTimer *hideTimer;
 
 - (void)onKeyboardWillHide:(NSNotification *)sender
 {
+    self.keyboardIsVisible = false;
+
     if (self.isWK) {
         [self setKeyboardHeight:0 delay:0.01];
         [self resetScrollView];
     }
-    hideTimer = [NSTimer scheduledTimerWithTimeInterval:0 target:self selector:@selector(fireOnHiding) userInfo:nil repeats:NO];
-}
-
-- (void)fireOnHiding {
     [self.commandDelegate evalJs:@"Keyboard.fireOnHiding();"];
+
 }
 
 - (void)onKeyboardWillShow:(NSNotification *)note
 {
-    if (hideTimer != nil) {
-        [hideTimer invalidate];
-    }
-    CGRect rect = [[note.userInfo valueForKey:UIKeyboardFrameEndUserInfoKey] CGRectValue];
-    double height = rect.size.height;
+    self.keyboardIsVisible = true;
+    if([[UIApplication sharedApplication] applicationState] == UIApplicationStateActive){
+        CGRect rect = [[note.userInfo valueForKey:UIKeyboardFrameEndUserInfoKey] CGRectValue];
+        double height = rect.size.height;
 
-    if (self.isWK) {
-        double duration = [[note.userInfo valueForKey:UIKeyboardAnimationDurationUserInfoKey] doubleValue];
-        [self setKeyboardHeight:height delay:duration+0.2];
-        [self resetScrollView];
+        if (self.isWK) {
+            double duration = [[note.userInfo valueForKey:UIKeyboardAnimationDurationUserInfoKey] doubleValue];
+            [self setKeyboardHeight:height delay:duration/2.0];
+            [self resetScrollView];
+        }
+    
+        NSString *js = [NSString stringWithFormat:@"Keyboard.fireOnShowing(%d);", (int)height];
+        [self.commandDelegate evalJs:js];
     }
-
-    NSString *js = [NSString stringWithFormat:@"Keyboard.fireOnShowing(%d);", (int)height];
-    [self.commandDelegate evalJs:js];
 }
 
 - (void)onKeyboardDidShow:(NSNotification *)note
 {
-    CGRect rect = [[note.userInfo valueForKey:UIKeyboardFrameEndUserInfoKey] CGRectValue];
-    double height = rect.size.height;
+    if([[UIApplication sharedApplication] applicationState] == UIApplicationStateActive){
+        CGRect rect = [[note.userInfo valueForKey:UIKeyboardFrameEndUserInfoKey] CGRectValue];
+        double height = rect.size.height;
 
-    if (self.isWK) {
-        [self resetScrollView];
+        if (self.isWK) {
+            [self resetScrollView];
+        }
+
+        NSString *js = [NSString stringWithFormat:@"Keyboard.fireOnShow(%d);", (int)height];
+        [self.commandDelegate evalJs:js];
     }
-
-    NSString *js = [NSString stringWithFormat:@"Keyboard.fireOnShow(%d);", (int)height];
-    [self.commandDelegate evalJs:js];
 }
 
 - (void)onKeyboardDidHide:(NSNotification *)sender
